@@ -208,22 +208,22 @@ export class LovelaceAcCard extends LitElement {
   }
 
   private _renderFan(fanMode: string | undefined, fanModes: string[], isOff: boolean): TemplateResult {
-    const idx = fanMode !== undefined ? Math.max(0, fanModes.indexOf(fanMode)) : 0;
-    const label = isOff ? '—' : fanMode !== undefined ? (FAN_LABELS[fanMode] ?? fanMode) : '';
     const spinning = !isOff && fanMode === 'auto';
     return html`
       <div class="fan-row ${isOff ? 'fan-off' : ''}">
         <ha-icon icon="mdi:fan" class="fan-icon ${spinning ? 'spin' : ''}"></ha-icon>
-        <div class="fan-ctrl">
-          <input
-            type="range"
-            min="0"
-            max=${fanModes.length - 1}
-            .value=${String(idx)}
-            ?disabled=${isOff}
-            @change=${(e: InputEvent) => this._setFan(fanModes[(e.target as HTMLInputElement).valueAsNumber])}
-          />
-          <span class="fan-label">${label}</span>
+        <div class="fan-chips">
+          ${fanModes.map(
+            (m) => html`
+              <button
+                class="fan-chip ${!isOff && m === fanMode ? 'active' : ''}"
+                ?disabled=${isOff}
+                @click=${() => this._setFan(m)}
+              >
+                ${FAN_LABELS[m] ?? m}
+              </button>
+            `,
+          )}
         </div>
       </div>
     `;
@@ -503,25 +503,38 @@ export class LovelaceAcCard extends LitElement {
         }
       }
 
-      .fan-ctrl {
+      .fan-chips {
         flex: 1;
         display: flex;
-        flex-direction: column;
-        gap: 2px;
+        flex-wrap: wrap;
+        gap: 6px;
       }
-      input[type='range'] {
-        width: 100%;
-        accent-color: var(--primary-color);
-        cursor: pointer;
-      }
-      input[type='range']:disabled {
-        cursor: default;
-      }
-      .fan-label {
-        font-size: 12px;
+      .fan-chip {
+        padding: 3px 10px;
+        border: 1.5px solid var(--divider-color);
+        border-radius: 99px;
+        background: none;
         color: var(--secondary-text-color);
-        text-align: right;
-        min-height: 1em;
+        font-size: 12px;
+        cursor: pointer;
+        transition:
+          border-color 0.2s,
+          color 0.2s,
+          background 0.2s;
+        white-space: nowrap;
+      }
+      .fan-chip:hover:not(:disabled):not(.active) {
+        border-color: var(--primary-color);
+        color: var(--primary-color);
+      }
+      .fan-chip.active {
+        border-color: var(--action-color, var(--primary-color));
+        color: var(--action-color, var(--primary-color));
+        background: var(--secondary-background-color);
+        font-weight: 600;
+      }
+      .fan-chip:disabled {
+        cursor: default;
       }
 
       .err {
