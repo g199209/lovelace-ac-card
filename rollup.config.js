@@ -38,7 +38,7 @@ export default [
   {
     input: 'src/boilerplate-card.ts',
     output: {
-      file: 'dist/boilerplate-card.js',
+      file: 'dist/lovelace-ac-card.js',
       format: 'es',
       inlineDynamicImports: true,
     },
