@@ -22,58 +22,50 @@ jobs:
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
 
-          node -e "const version = process.env.VERSION; const semverRegex = /^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-((?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\\.(?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\\+([0-9a-zA-Z-]+(?:\\.[0-9a-zA-Z-]+)*))?$/; if (!semverRegex.test(version)) { console.error(`Invalid release tag '${process.env.GITHUB_REF_NAME}'. Expected semver like '1.2.3' or 'v1.2.3'.`); process.exit(1); }"
+          node -e "const version = process.env.VERSION; const semverRegex = /^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-((?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\\.(?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\\+([0-9a-zA-Z-]+(?:\\.[0-9a-zA-Z-]+)*))?$/; if (!semverRegex.test(version)) { console.error(\`Invalid release tag '\${process.env.GITHUB_REF_NAME}'. Expected semver like '1.2.3' or 'v1.2.3'.\`); process.exit(1); }"
 
           echo "Release tag is valid semver: $VERSION"
         env:
           VERSION: ${{ github.ref_name }}
 
-      - name: Bump versions from release tag
+      - name: Bump version in package.json and source
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           echo "Using release version: $VERSION"
 
           node -e "const fs=require('fs');const version=process.env.VERSION;const pkgPath='package.json';const pkg=JSON.parse(fs.readFileSync(pkgPath,'utf8'));pkg.version=version;fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');"
 
-          sed -i "s/^export const CARD_VERSION = '.*';$/export const CARD_VERSION = '$VERSION';/" src/const.ts
+          sed -i "s/LOVELACE-AC-CARD \\\\n%c  v[0-9][^ ]*/LOVELACE-AC-CARD \\\\n%c  v$VERSION/" src/boilerplate-card.ts
         env:
           VERSION: ${{ github.ref_name }}
 
-      - name: Validate bumped versions
+      - name: Validate bumped version
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
 
           PKG_VERSION=$(node -p "require('./package.json').version")
-          CONST_VERSION=$(sed -n "s/^export const CARD_VERSION = '\(.*\)';$/\1/p" src/const.ts)
 
           [ "$PKG_VERSION" = "$VERSION" ] || {
             echo "package.json version mismatch: expected '$VERSION', got '$PKG_VERSION'"
             exit 1
           }
 
-          [ "$CONST_VERSION" = "$VERSION" ] || {
-            echo "src/const.ts CARD_VERSION mismatch: expected '$VERSION', got '$CONST_VERSION'"
-            exit 1
-          }
-
           echo "Version validation passed: $VERSION"
 
-      # Build
       - name: Install dependencies
         run: |
           corepack enable
           corepack prepare yarn@4.12.0 --activate
           yarn install --immutable
 
-      - name: Build the file
+      - name: Build
         run: yarn build
 
-      # Upload build artifact to the release as an asset.
       - name: Upload release asset
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: dist/boilerplate-card.js
-          asset_name: boilerplate-card.js
+          file: dist/lovelace-ac-card.js
+          asset_name: lovelace-ac-card.js
           tag: ${{ github.ref }}
           overwrite: true
