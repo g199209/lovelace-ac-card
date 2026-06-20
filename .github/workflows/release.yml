@@ -22,36 +22,44 @@ jobs:
 
       - name: Validate release tag is semver
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
+          TAG="${{ github.event.release.tag_name }}"
+          VERSION="${TAG#v}"
 
-          node -e "const version = process.env.VERSION; const semverRegex = /^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-((?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\\.(?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\\+([0-9a-zA-Z-]+(?:\\.[0-9a-zA-Z-]+)*))?$/; if (!semverRegex.test(version)) { console.error(\`Invalid release tag '\${process.env.GITHUB_REF_NAME}'. Expected semver like '1.2.3' or 'v1.2.3'.\`); process.exit(1); }"
-
-          echo "Release tag is valid semver: $VERSION"
-        env:
-          VERSION: ${{ github.ref_name }}
+          node -e "
+            const version = '$VERSION';
+            const semverRegex = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(-([\w.-]+))?(\+([\w.-]+))?$/;
+            if (!semverRegex.test(version)) {
+              console.error('Invalid release tag: $TAG. Expected semver like v1.2.3');
+              process.exit(1);
+            }
+            console.log('Release tag is valid semver: ' + version);
+          "
 
       - name: Bump version in package.json and source
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
+          TAG="${{ github.event.release.tag_name }}"
+          VERSION="${TAG#v}"
           echo "Using release version: $VERSION"
 
-          node -e "const fs=require('fs');const version=process.env.VERSION;const pkgPath='package.json';const pkg=JSON.parse(fs.readFileSync(pkgPath,'utf8'));pkg.version=version;fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');"
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            pkg.version = '$VERSION';
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          "
 
           sed -i "s/LOVELACE-AC-CARD \\\\n%c  v[0-9][^ ]*/LOVELACE-AC-CARD \\\\n%c  v$VERSION/" src/boilerplate-card.ts
-        env:
-          VERSION: ${{ github.ref_name }}
 
       - name: Validate bumped version
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-
+          TAG="${{ github.event.release.tag_name }}"
+          VERSION="${TAG#v}"
           PKG_VERSION=$(node -p "require('./package.json').version")
 
           [ "$PKG_VERSION" = "$VERSION" ] || {
             echo "package.json version mismatch: expected '$VERSION', got '$PKG_VERSION'"
             exit 1
           }
-
           echo "Version validation passed: $VERSION"
 
       - name: Install dependencies
@@ -69,5 +77,5 @@ jobs:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: dist/lovelace-ac-card.js
           asset_name: lovelace-ac-card.js
-          tag: ${{ github.ref }}
+          tag: ${{ github.event.release.tag_name }}
           overwrite: true
