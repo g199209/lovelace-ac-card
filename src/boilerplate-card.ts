@@ -4,7 +4,7 @@ import { HomeAssistant } from 'custom-card-helpers';
 import type { AcCardConfig } from './types';
 
 console.info(
-  `%c  LOVELACE-AC-CARD \n%c  v2.0.0  `,
+  `%c  LOVELACE-AC-CARD \n%c  v2.1.0  `,
   'color: #03a9f4; font-weight: bold; background: black',
   'color: white; font-weight: bold; background: dimgray',
 );
