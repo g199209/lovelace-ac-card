@@ -4,7 +4,7 @@ import { HomeAssistant } from 'custom-card-helpers';
 import type { AcCardConfig } from './types';
 
 console.info(
-  `%c  LOVELACE-AC-CARD \n%c  v2.1.0  `,
+  `%c  LOVELACE-AC-CARD \n%c  v2.2.0  `,
   'color: #03a9f4; font-weight: bold; background: black',
   'color: white; font-weight: bold; background: dimgray',
 );
@@ -87,8 +87,6 @@ const SLIDER_MODES: Record<string, string> = {
   heat_cool: 'full',
 };
 
-const PRIMARY_MODES = ['off', 'cool', 'heat'];
-
 @customElement('lovelace-ac-card')
 export class LovelaceAcCard extends LitElement {
   public static getStubConfig(): Record<string, unknown> {
@@ -128,15 +126,12 @@ export class LovelaceAcCard extends LitElement {
     const step = (s.attributes.target_temp_step as number | undefined) ?? 1;
     const fanMode = s.attributes.fan_mode as string | undefined;
     const fanModes = (s.attributes.fan_modes as string[] | undefined) ?? [];
-    const hvacModes = (s.attributes.hvac_modes as string[] | undefined) ?? [];
     const isOff = mode === 'off';
 
     const cfg = HVAC_CFG[mode] ?? HVAC_CFG.off;
     const color = cfg.color;
     const sliderMode = SLIDER_MODES[mode] ?? 'full';
     const displayTemp = this._pendingTemp ?? tgtTemp;
-
-    const shownModes = PRIMARY_MODES.filter((m) => hvacModes.includes(m));
 
     return html`
       <ha-card>
@@ -162,7 +157,7 @@ export class LovelaceAcCard extends LitElement {
             @value-changing=${this._onValueChanging}
           ></ha-control-circular-slider>
           <div class="info">
-            <p class="label">${cfg.label}</p>
+            <button class="label" @click=${this._togglePower} title="点击开关机">${cfg.label}</button>
             ${displayTemp !== undefined
               ? html`<ha-big-number .value=${displayTemp} .unit=${'°C'}></ha-big-number>`
               : html`<p class="na">—</p>`}
@@ -183,27 +178,9 @@ export class LovelaceAcCard extends LitElement {
           </div>
         </div>
 
-        <!-- Mode buttons + fan slider -->
-        <div class="controls">
-          <div class="mode-row">${shownModes.map((m) => this._renderModeBtn(m, mode))}</div>
-          ${fanModes.length > 0 ? this._renderFan(fanMode, fanModes, isOff) : nothing}
-        </div>
+        <!-- Fan control -->
+        <div class="controls">${fanModes.length > 0 ? this._renderFan(fanMode, fanModes, isOff) : nothing}</div>
       </ha-card>
-    `;
-  }
-
-  private _renderModeBtn(m: string, active: string): TemplateResult {
-    const cfg = HVAC_CFG[m] ?? { icon: 'mdi:help', label: m, color: 'var(--primary-color)' };
-    const isActive = m === active;
-    return html`
-      <button
-        class="mode-btn ${isActive ? 'active' : ''}"
-        style=${isActive ? `--mc: ${cfg.color}` : ''}
-        @click=${() => this._setMode(m)}
-      >
-        <ha-icon icon=${cfg.icon}></ha-icon>
-        <span>${cfg.label}</span>
-      </button>
     `;
   }
 
@@ -260,10 +237,13 @@ export class LovelaceAcCard extends LitElement {
     });
   }
 
-  private _setMode(m: string): void {
-    this.hass.callService('climate', 'set_hvac_mode', {
+  private _togglePower(): void {
+    const s = this.hass.states[this.config.entity];
+    // Power is decoupled from mode: turning on lets the integration pick the
+    // seasonal mode (heat in winter, cool otherwise). Mode is never set here.
+    const service = s?.state === 'off' ? 'turn_on' : 'turn_off';
+    this.hass.callService('climate', service, {
       entity_id: this.config.entity,
-      hvac_mode: m,
     });
   }
 
@@ -364,16 +344,28 @@ export class LovelaceAcCard extends LitElement {
         margin: 0;
       }
 
+      /* Clickable status text doubles as the power toggle */
       .label {
+        font: inherit;
         font-weight: var(--ha-font-weight-medium, 500);
         color: var(--action-color, inherit);
-        transition: color 0.3s;
+        transition:
+          color 0.3s,
+          opacity 0.2s;
         text-align: center;
         width: 60%;
         overflow: hidden;
         display: -webkit-box;
         -webkit-line-clamp: 2;
         -webkit-box-orient: vertical;
+        background: none;
+        border: none;
+        padding: 2px 6px;
+        cursor: pointer;
+        border-radius: var(--ha-border-radius-pill, 999px);
+      }
+      .label:hover {
+        opacity: 0.7;
       }
 
       ha-big-number {
@@ -435,44 +427,6 @@ export class LovelaceAcCard extends LitElement {
         padding: 0 12px 12px;
         box-sizing: border-box;
         flex: none;
-      }
-
-      .mode-row {
-        display: flex;
-        gap: 8px;
-        padding: 8px 0 4px;
-      }
-
-      .mode-btn {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 5px;
-        padding: 10px 4px;
-        border: 1.5px solid var(--divider-color);
-        border-radius: 12px;
-        background: none;
-        color: var(--secondary-text-color);
-        font-size: 12px;
-        cursor: pointer;
-        transition:
-          border-color 0.2s,
-          color 0.2s,
-          background 0.2s;
-      }
-      .mode-btn ha-icon {
-        --mdc-icon-size: 22px;
-      }
-      .mode-btn:hover:not(.active) {
-        border-color: var(--primary-color);
-        color: var(--primary-color);
-      }
-      .mode-btn.active {
-        border-color: var(--mc, var(--primary-color));
-        color: var(--mc, var(--primary-color));
-        background: var(--secondary-background-color);
-        font-weight: 600;
       }
 
       /* ── Fan row ─────────────────────────────────────── */
